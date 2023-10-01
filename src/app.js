@@ -7,6 +7,7 @@ const helmet = require('helmet');
 
 const indexRouter = require('./routes/index');
 
+const scraperHandler = require('./middleware/scraperHandler');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -17,6 +18,7 @@ app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
+app.use(scraperHandler.handler);
 
 app.use('/api', indexRouter);
 

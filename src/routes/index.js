@@ -1,42 +1,10 @@
-const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
-const NodeCache = require("node-cache");
 const express = require('express');
 
-const { getPostId } = require('../lib/instagram/helpers');
-const { getCache, setCache } = require('../lib/cache');
-const { browserOptions, handleBlockedResources } = require('../lib/scraper');
+const { getPostId } = require('../lib/utils');
+const { handleBlockedResources } = require('../lib/scraper');
 
 const router = express.Router();
-const cache = new NodeCache();
-
-let browser;
-const activePostsId = {};
-
-
-const waitForCurrentTab = (postId, attempts = 15) => {
-  return new Promise((resolve) => {
-    let secondsRemaining = attempts;
-    const interval = setInterval(async () => {
-      const cachedResponse = await getCache(cache, postId);
-      if (cachedResponse) {
-        clearInterval(interval);
-        resolve(cachedResponse);
-      }
-
-      if (secondsRemaining === 0) {
-        clearInterval(interval);
-        resolve(null);
-      }
-
-      if (postId in activePostsId) {
-        secondsRemaining = 0;
-      } else {
-        secondsRemaining -= 1;
-      }
-    }, 1000);
-  });
-}
 
 
 router.get('/video', async (req, res, next) => {
@@ -53,18 +21,15 @@ router.get('/video', async (req, res, next) => {
   }
 
   // Check if cached response exists
-  let cachedResponse = await getCache(cache, postId)
+  const { scraper } = req;
+  let cachedResponse = await scraper.getCache(postId)
   if (cachedResponse) {
     return res.status(200).json(cachedResponse);
   }
 
-  if (!browser) {
-    browser = await puppeteer.launch(browserOptions);
-  }
-
   // Check if this post is already being processed
-  if (postId in activePostsId) {
-    cachedResponse = await waitForCurrentTab(postId);
+  if (postId in scraper.activePostsId) {
+    cachedResponse = await scraper.waitForCache(postId);
     if (cachedResponse) {
       return res.status(200).json(cachedResponse);
     }
@@ -77,12 +42,12 @@ router.get('/video', async (req, res, next) => {
     const postUrl = `https://www.instagram.com/p/${postId}/`;
 
     // Open new browser tab
-    currentPage = await browser.newPage();
+    currentPage = await scraper.browser.newPage();
     // Intercept and block certain resource types for better performance
     await currentPage.setRequestInterception(true);
     currentPage.on("request", handleBlockedResources);
     // Load post page
-    activePostsId[postId] = true;
+    scraper.addActivePost(postId);
     await currentPage.goto(postUrl, { waitUntil: 'networkidle0' });
 
     // Parse page HTML
@@ -110,12 +75,12 @@ router.get('/video', async (req, res, next) => {
     }
 
     const response = { videoUrl };
-    setCache(cache, postId, response);
+    scraper.setCache(postId, response);
     return res.status(200).send(response);
   } catch (error) {
     return next(error);
   } finally {
-    delete activePostsId[postId];
+    scraper.removeActivePost(postId);
     await currentPage.close();
   }
 });
