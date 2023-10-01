@@ -1,4 +1,4 @@
-# Instagram Scraper API
+# Instagram Video Scraper API
 
 Scrape instagram videos with no login required using puppeteer and express.
 
