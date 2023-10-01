@@ -34,9 +34,9 @@ npm start
 
 - `GET /api/video?url={POST_URL}`: Scrapes the video URL of the specified Instagram Post/Reel URL.
 
-## Example
+## Examples
 
-## Request Example
+### Request Example
 
 ```javascript
 const fetch = require('node-fetch');
@@ -56,7 +56,7 @@ fetch(apiUrl)
   });
 ```
 
-## Response Example
+### Response Example
 
 ```json
 {
