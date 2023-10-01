@@ -36,14 +36,6 @@ npm start
 
 ## Example
 
-## Response Example
-
-```json
-{
-  "videoUrl": "https://scontent.cdninstagram.com/v/t50.2886-16/385047357_643...mp4?...",
-}
-```
-
 ## Request Example
 
 ```javascript
@@ -62,6 +54,14 @@ fetch(apiUrl)
   .catch(error => {
     console.error(error);
   });
+```
+
+## Response Example
+
+```json
+{
+  "videoUrl": "https://scontent.cdninstagram.com/v/t50.2886-16/385047357_643...mp4?...",
+}
 ```
 
 ## License
