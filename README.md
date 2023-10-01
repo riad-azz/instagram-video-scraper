@@ -32,11 +32,11 @@ npm start
 
 ## API Endpoints
 
-- `GET /api/video?url={POST_URL}`: Scrapes video URL of the specified Instagram Post/Reel URL.
+- `GET /api/video?url={POST_URL}`: Scrapes the video URL of the specified Instagram Post/Reel URL.
 
 ## Example
 
-- `Response Example`:
+## Response Example
 
 ```json
 {
@@ -44,7 +44,7 @@ npm start
 }
 ```
 
-- `Request Example`:
+## Request Example
 
 ```javascript
 const fetch = require('node-fetch');
