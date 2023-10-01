@@ -15,6 +15,7 @@
     "cookie-parser": "^1.4.5",
     "cors": "^2.8.5",
     "express": "^4.17.1",
+    "express-async-handler": "^1.2.0",
     "helmet": "^3.23.3",
     "http-errors": "^1.8.0",
     "morgan": "^1.10.0",

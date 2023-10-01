@@ -1,6 +1,6 @@
 const puppeteer = require('puppeteer');
 const NodeCache = require("node-cache");
-
+const { CustomError } = require('../lib/errors');
 
 const minimalArgs = [
   '--autoplay-policy=user-gesture-required',
@@ -40,36 +40,63 @@ const minimalArgs = [
   '--use-mock-keychain',
   '--window-size=100,100'
 ];
+
 const browserOptions = {
-  headless: false,
+  headless: "new",
   defaultViewport: { width: 100, height: 100 },
   args: minimalArgs,
 };
 
-const cacheInstance = new NodeCache();
-
-const scraperHandler = {
-  browser: null,
-  handler: async (req, res, next) => {
-    if (!scraperHandler.browser) {
-      scraperHandler.browser = await puppeteer.launch(browserOptions);
+const createScraperMiddleware = () => {
+  const middleware = async (req, res, next) => {
+    if (!middleware.browser) {
+      middleware.browser = await puppeteer.launch(browserOptions);
     }
-    req.scraper = scraperHandler;
-    next()
-  },
-  activePostsId: {},
-  addActivePost: (tabId) => {
-    scraperHandler.activePostsId[tabId] = true;
-  },
-  removeActivePost: (tabId) => {
-    delete scraperHandler.activePostsId[tabId];
-  },
-  waitForCache: (key, tabId = null, attempts = 15) => {
+    req.scraper = middleware;
+    next();
+  };
+
+  // Initialize dependencies
+  middleware.cache = new NodeCache();
+
+  middleware.activePostsId = {};
+  middleware.addActivePost = (tabId) => {
+    middleware.activePostsId[tabId] = true;
+  };
+  middleware.removeActivePost = (tabId) => {
+    delete middleware.activePostsId[tabId];
+  };
+
+  middleware.setCache = async (key, value, expire = 3600) => {
+    try {
+      const cachedValue = JSON.stringify(value);
+      middleware.cache.set(key, cachedValue, expire);
+    }
+    catch (error) {
+      console.log("Error setting cache:", error); // eslint-disable-line no-console
+    }
+  };
+
+  middleware.getCache = async (cacheKey) => {
+    try {
+      const cachedValue = await middleware.cache.get(cacheKey);
+      if (cachedValue) {
+        const parsedValue = JSON.parse(cachedValue);
+        return parsedValue;
+      }
+    } catch (error) {
+      console.log("Error getting cache:", error); // eslint-disable-line no-console
+    }
+
+    return null;
+  };
+
+  middleware.waitForCache = (key, tabId = null, attempts = 15) => {
     const waitedTabId = tabId || key;
     return new Promise((resolve) => {
       let secondsRemaining = attempts;
       const interval = setInterval(async () => {
-        const cachedResponse = await scraperHandler.getCache(key);
+        const cachedResponse = await middleware.getCache(key);
         if (cachedResponse) {
           clearInterval(interval);
           resolve(cachedResponse);
@@ -80,39 +107,36 @@ const scraperHandler = {
           resolve(null);
         }
 
-        if (!(waitedTabId in scraperHandler.activePostsId)) {
+        if (!(waitedTabId in middleware.activePostsId)) {
           secondsRemaining = 0;
         } else {
           secondsRemaining -= 1;
         }
       }, 1000);
     });
-  },
-  // Caching Logic
-  cache: cacheInstance,
-  setCache: async (key, value, expire = 3600) => {
-    try {
-      const cachedValue = JSON.stringify(value);
-      scraperHandler.cache.set(key, cachedValue, expire);
+  };
+
+  middleware.isAlreadyProcessed = async (key, tabId = null) => {
+    const waitedTabId = tabId || key;
+    // Check if cached response exists
+    let cachedResponse = await middleware.getCache(key)
+    if (cachedResponse) {
+      return cachedResponse;
     }
-    catch (error) {
-      console.log("Error setting cache:", error); // eslint-disable-line no-console
-    }
-  },
-  getCache: async (cacheKey) => {
-    try {
-      const cachedValue = await scraperHandler.cache.get(cacheKey);
-      if (cachedValue) {
-        const parsedValue = JSON.parse(cachedValue);
-        return parsedValue;
+
+    // Check if this post is being processed
+    if (key in middleware.activePostsId) {
+      cachedResponse = await middleware.waitForCache(key, waitedTabId);
+      if (cachedResponse) {
+        return cachedResponse
       }
-    } catch (error) {
-      console.log("Error getting cache:", error); // eslint-disable-line no-console
+      throw new CustomError("Request timed out, please try again", 408);
     }
 
     return null;
-  },
-}
+  }
 
+  return middleware;
+};
 
-module.exports = scraperHandler
+module.exports = createScraperMiddleware()
